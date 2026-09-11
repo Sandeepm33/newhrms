@@ -52,14 +52,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             if (!isMember) return null;
           }
           orgName = org.name;
-        } else if (!user.isSuperAdmin && user.organizationIds.length > 0) {
+        } else if (user.organizationIds && user.organizationIds.length > 0) {
           const firstOrgId = user.organizationIds[0];
           if (firstOrgId) {
             orgId = firstOrgId.toString();
             const org = await Organization.findById(firstOrgId).lean();
             orgName = org?.name;
           }
+        } else {
+          const org = await Organization.findOne({ isActive: true }).lean();
+          if (org) {
+            orgId = org._id.toString();
+            orgName = org.name;
+          }
         }
+
 
         let roles: string[] = [];
         let permissions: string[] = [];

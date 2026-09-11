@@ -43,21 +43,22 @@ export const updateOrganizationSchema = createOrganizationSchema.partial();
 export const createEmployeeSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  personalEmail: z.string().email('Invalid email').optional(),
-  workEmail: z.string().email('Invalid work email').optional(),
-  employeeCode: z.string().optional(),
-  joiningDate: z.string().optional(),
-  departmentId: z.string().optional(),
-  designationId: z.string().optional(),
-  locationId: z.string().optional(),
-  reportingManagerId: z.string().optional(),
-  employmentTypeId: z.string().optional(),
-  businessUnitId: z.string().optional(),
-  legalEntityId: z.string().optional(),
-  gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']).optional(),
-  dateOfBirth: z.string().optional(),
-  phone: z.string().optional(),
+  personalEmail: z.string().email('Invalid email').optional().or(z.literal('')),
+  workEmail: z.string().email('Invalid work email').optional().or(z.literal('')),
+  employeeCode: z.string().optional().or(z.literal('')),
+  joiningDate: z.string().optional().or(z.literal('')),
+  departmentId: z.string().optional().or(z.literal('')),
+  designationId: z.string().optional().or(z.literal('')),
+  locationId: z.string().optional().or(z.literal('')),
+  reportingManagerId: z.string().optional().or(z.literal('')),
+  employmentTypeId: z.string().optional().or(z.literal('')),
+  businessUnitId: z.string().optional().or(z.literal('')),
+  legalEntityId: z.string().optional().or(z.literal('')),
+  gender: z.enum(['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY']).optional().or(z.literal('')),
+  dateOfBirth: z.string().optional().or(z.literal('')),
+  phone: z.string().optional().or(z.literal('')),
 });
+
 
 export const updateEmployeeSchema = createEmployeeSchema.partial();
 

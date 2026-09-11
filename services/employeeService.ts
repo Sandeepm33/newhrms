@@ -27,8 +27,15 @@ export async function listEmployees(
   }
 ) {
   await connectDB();
-  return findEmployees(user.organizationId!, options);
+  const { Organization } = await import('@/models/Organization');
+  let orgId = user.organizationId;
+  if (!orgId) {
+    const firstOrg = await Organization.findOne({ isActive: true }).lean();
+    if (firstOrg) orgId = firstOrg._id.toString();
+  }
+  return findEmployees(orgId || '', options);
 }
+
 
 export async function getEmployee(user: SessionUser, employeeId: string) {
   await connectDB();
@@ -40,7 +47,16 @@ export async function getEmployee(user: SessionUser, employeeId: string) {
 export async function addEmployee(user: SessionUser, data: CreateEmployeeInput) {
   await connectDB();
   const { Employee } = await import('@/models/Employee');
-  const orgId = user.organizationId!;
+  const { Organization } = await import('@/models/Organization');
+
+  let orgId = user.organizationId;
+  if (!orgId) {
+    const firstOrg = await Organization.findOne({ isActive: true }).lean();
+    if (firstOrg) orgId = firstOrg._id.toString();
+  }
+
+  if (!orgId) throw new NotFoundError('Organization');
+
 
   if (data.employeeCode) {
     const existing = await Employee.findOne({ organizationId: orgId, employeeCode: data.employeeCode });

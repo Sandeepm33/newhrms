@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Clock,
   CalendarCheck,
@@ -9,34 +9,112 @@ import {
   Search,
   Filter,
   Download,
-  Check,
-  X,
-  ArrowUpRight,
+  Users,
+  MapPin,
+  RefreshCw,
 } from 'lucide-react';
 
+interface AttendanceRecord {
+  _id: string;
+  employee: {
+    code: string;
+    name: string;
+  };
+  date: string;
+  clockIn?: string;
+  clockOut?: string;
+  totalHours: number;
+  status: string;
+  notes?: string;
+}
+
+interface AttendanceStats {
+  totalEmployees: number;
+  presentCount: number;
+  lateCount: number;
+  onLeaveCount: number;
+  absentCount: number;
+  attendancePercentage: number;
+}
+
 export default function AttendancePage() {
+  const [attendances, setAttendances] = useState<AttendanceRecord[]>([]);
+  const [stats, setStats] = useState<AttendanceStats | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [clocking, setClocking] = useState(false);
   const [clockedIn, setClockedIn] = useState(false);
   const [clockTime, setClockTime] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const sampleAttendance = [
-    { id: '1', emp: 'Rahul Sharma', code: 'EMP-001', checkIn: '09:02 AM', checkOut: '06:05 PM', status: 'PRESENT', hours: '9h 03m' },
-    { id: '2', emp: 'Priya Patel', code: 'EMP-002', checkIn: '09:45 AM', checkOut: '06:30 PM', status: 'LATE', hours: '8h 45m' },
-    { id: '3', emp: 'Ankit Verma', code: 'EMP-003', checkIn: '-', checkOut: '-', status: 'ON_LEAVE', hours: '0h 00m' },
-    { id: '4', emp: 'Sneha Gupta', code: 'EMP-004', checkIn: '08:55 AM', checkOut: '06:00 PM', status: 'PRESENT', hours: '9h 05m' },
-    { id: '5', emp: 'Vikram Singh', code: 'EMP-005', checkIn: '10:15 AM', checkOut: '-', status: 'HALF_DAY', hours: '4h 15m' },
-  ];
+  useEffect(() => {
+    fetchData();
+  }, [selectedDate]);
 
-  function handleClockToggle() {
-    if (!clockedIn) {
-      setClockedIn(true);
-      setClockTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    } else {
-      setClockedIn(false);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [resAtt, resStats] = await Promise.all([
+        fetch(`/api/attendance?date=${selectedDate}`),
+        fetch(`/api/attendance/stats`),
+      ]);
+
+      const dataAtt = await resAtt.json();
+      const dataStats = await resStats.json();
+
+      if (dataAtt.success) {
+        setAttendances(dataAtt.data);
+        // Check if current user has clocked in today
+        const todayRecord = dataAtt.data.find((a: AttendanceRecord) => a.clockIn && !a.clockOut);
+        if (todayRecord) {
+          setClockedIn(true);
+          setClockTime(new Date(todayRecord.clockIn!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        } else {
+          setClockedIn(false);
+        }
+      }
+
+      if (dataStats.success) {
+        setStats(dataStats.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch attendance data:', err);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
+
+  const handleClockToggle = async () => {
+    setClocking(true);
+    try {
+      const action = clockedIn ? 'CLOCK_OUT' : 'CLOCK_IN';
+      const res = await fetch('/api/attendance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        fetchData();
+      } else {
+        alert(data.message || 'Action failed');
+      }
+    } catch (err) {
+      console.error('Clock action failed:', err);
+    } finally {
+      setClocking(false);
+    }
+  };
+
+  const filteredAttendances = attendances.filter(
+    (a) =>
+      a.employee.name.toLowerCase().includes(search.toLowerCase()) ||
+      a.employee.code.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 40 }}>
       {/* Header & Quick Clock-in */}
       <div
         className="glass-card"
@@ -59,7 +137,7 @@ export default function AttendancePage() {
             </h1>
           </div>
           <p style={{ color: 'var(--text-secondary)', margin: 0, fontSize: 14 }}>
-            Real-time biometric sync, shift rosters, and daily attendance logs
+            Real-time web punch, biometric log sync, and attendance management
           </p>
         </div>
 
@@ -72,6 +150,7 @@ export default function AttendancePage() {
           )}
           <button
             onClick={handleClockToggle}
+            disabled={clocking}
             className="btn"
             style={{
               padding: '12px 24px',
@@ -85,7 +164,7 @@ export default function AttendancePage() {
               cursor: 'pointer',
             }}
           >
-            {clockedIn ? 'Clock Out' : 'Web Punch Clock-In'}
+            {clocking ? 'Processing...' : clockedIn ? 'Clock Out' : 'Web Punch Clock-In'}
           </button>
         </div>
       </div>
@@ -95,15 +174,17 @@ export default function AttendancePage() {
         <div className="glass-card" style={{ padding: 20 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Present Today</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CheckCircle2 size={20} color="#10b981" /> 482 / 512
+            <CheckCircle2 size={20} color="#10b981" /> {stats?.presentCount ?? 0} / {stats?.totalEmployees ?? 0}
           </div>
-          <span style={{ fontSize: 11, color: '#10b981', marginTop: 4, display: 'inline-block' }}>94.1% Attendance Rate</span>
+          <span style={{ fontSize: 11, color: '#10b981', marginTop: 4, display: 'inline-block' }}>
+            {stats?.attendancePercentage ?? 0}% Attendance Rate
+          </span>
         </div>
 
         <div className="glass-card" style={{ padding: 20 }}>
-          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>On Leave / WFH</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>On Leave</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CalendarCheck size={20} color="#6366f1" /> 24
+            <CalendarCheck size={20} color="#6366f1" /> {stats?.onLeaveCount ?? 0}
           </div>
           <span style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4, display: 'inline-block' }}>Approved Absences</span>
         </div>
@@ -111,9 +192,17 @@ export default function AttendancePage() {
         <div className="glass-card" style={{ padding: 20 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Late Arrivals</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertCircle size={20} color="#f59e0b" /> 6
+            <AlertCircle size={20} color="#f59e0b" /> {stats?.lateCount ?? 0}
           </div>
-          <span style={{ fontSize: 11, color: '#f59e0b', marginTop: 4, display: 'inline-block' }}>Grace time applied</span>
+          <span style={{ fontSize: 11, color: '#f59e0b', marginTop: 4, display: 'inline-block' }}>Past 10:00 AM Threshold</span>
+        </div>
+
+        <div className="glass-card" style={{ padding: 20 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Absent</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Users size={20} color="#ef4444" /> {stats?.absentCount ?? 0}
+          </div>
+          <span style={{ fontSize: 11, color: '#ef4444', marginTop: 4, display: 'inline-block' }}>Unexplained Absences</span>
         </div>
       </div>
 
@@ -121,72 +210,97 @@ export default function AttendancePage() {
       <div className="glass-card" style={{ padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 16 }}>
           <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-            Daily Attendance Log (Today)
+            Daily Attendance Log
           </h3>
 
-          <div style={{ display: 'flex', gap: 12 }}>
-            <div style={{ position: 'relative', width: 260 }}>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <input
+              type="date"
+              className="form-input"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              style={{ padding: '6px 12px', fontSize: 13 }}
+            />
+            <div style={{ position: 'relative', width: 220 }}>
               <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input type="text" className="form-input" placeholder="Search employee..." style={{ paddingLeft: 32, fontSize: 13 }} />
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Search employee..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ paddingLeft: 32, fontSize: 13 }}
+              />
             </div>
-            <button className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-              <Filter size={14} /> Filter
-            </button>
-            <button className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-              <Download size={14} /> Export
+            <button onClick={fetchData} className="btn btn-secondary" style={{ padding: '8px 12px' }}>
+              <RefreshCw size={14} />
             </button>
           </div>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--surface-border)', color: 'var(--text-muted)', fontSize: 12 }}>
-                <th style={{ padding: '12px 16px' }}>Employee</th>
-                <th style={{ padding: '12px 16px' }}>Code</th>
-                <th style={{ padding: '12px 16px' }}>Check In</th>
-                <th style={{ padding: '12px 16px' }}>Check Out</th>
-                <th style={{ padding: '12px 16px' }}>Work Hours</th>
-                <th style={{ padding: '12px 16px' }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sampleAttendance.map((row) => (
-                <tr key={row.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                  <td style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{row.emp}</td>
-                  <td style={{ padding: '14px 16px', fontFamily: 'monospace', color: 'var(--brand-400)' }}>{row.code}</td>
-                  <td style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>{row.checkIn}</td>
-                  <td style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>{row.checkOut}</td>
-                  <td style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{row.hours}</td>
-                  <td style={{ padding: '14px 16px' }}>
-                    <span
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 20,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        background:
-                          row.status === 'PRESENT'
-                            ? 'rgba(16,185,129,0.15)'
-                            : row.status === 'LATE'
-                            ? 'rgba(245,158,11,0.15)'
-                            : 'rgba(99,102,241,0.15)',
-                        color:
-                          row.status === 'PRESENT'
-                            ? '#10b981'
-                            : row.status === 'LATE'
-                            ? '#f59e0b'
-                            : '#6366f1',
-                      }}
-                    >
-                      {row.status}
-                    </span>
-                  </td>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>Loading attendance logs...</div>
+        ) : filteredAttendances.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+            No attendance records found for this date.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--surface-border)', color: 'var(--text-muted)', fontSize: 12 }}>
+                  <th style={{ padding: '12px 16px' }}>Employee</th>
+                  <th style={{ padding: '12px 16px' }}>Code</th>
+                  <th style={{ padding: '12px 16px' }}>Clock In</th>
+                  <th style={{ padding: '12px 16px' }}>Clock Out</th>
+                  <th style={{ padding: '12px 16px' }}>Total Hours</th>
+                  <th style={{ padding: '12px 16px' }}>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filteredAttendances.map((row) => (
+                  <tr key={row._id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                    <td style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>{row.employee.name}</td>
+                    <td style={{ padding: '14px 16px', fontFamily: 'monospace', color: 'var(--brand-400)' }}>{row.employee.code}</td>
+                    <td style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>
+                      {row.clockIn ? new Date(row.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                    </td>
+                    <td style={{ padding: '14px 16px', color: 'var(--text-secondary)' }}>
+                      {row.clockOut ? new Date(row.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
+                    </td>
+                    <td style={{ padding: '14px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {row.totalHours ? `${row.totalHours} hrs` : '-'}
+                    </td>
+                    <td style={{ padding: '14px 16px' }}>
+                      <span
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 20,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          background:
+                            row.status === 'PRESENT'
+                              ? 'rgba(16,185,129,0.15)'
+                              : row.status === 'LATE'
+                              ? 'rgba(245,158,11,0.15)'
+                              : 'rgba(99,102,241,0.15)',
+                          color:
+                            row.status === 'PRESENT'
+                              ? '#10b981'
+                              : row.status === 'LATE'
+                              ? '#f59e0b'
+                              : '#6366f1',
+                        }}
+                      >
+                        {row.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

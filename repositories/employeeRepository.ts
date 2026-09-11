@@ -228,20 +228,21 @@ export async function createEmployee(
     firstName: data.firstName,
     lastName: data.lastName,
     displayName: `${data.firstName} ${data.lastName}`,
-    gender: data.gender,
+    gender: data.gender || undefined,
     dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : undefined,
-    personalEmail: data.personalEmail,
-    personalPhone: data.phone,
+    personalEmail: data.personalEmail || undefined,
+    personalPhone: data.phone || undefined,
   });
 
   await EmployeeContact.create({
     employeeId: employee._id,
     organizationId: orgId,
-    workEmail: data.workEmail,
+    workEmail: data.workEmail || undefined,
   });
 
   return (employee._id as mongoose.Types.ObjectId).toString();
 }
+
 
 export async function updateEmployee(
   employeeId: string,

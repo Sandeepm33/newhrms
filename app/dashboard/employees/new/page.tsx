@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Save, Loader2, User, Building, MapPin, Briefcase, Users } from 'lucide-react';
+import { ChevronLeft, Save, Loader2, User, Building, Briefcase } from 'lucide-react';
 import Link from 'next/link';
 
 interface SelectOption { _id: string; name: string; }
@@ -11,6 +11,30 @@ interface FormData {
   phone: string; dateOfBirth: string; gender: string; joiningDate: string;
   employeeCode: string; departmentId: string; designationId: string;
   locationId: string; reportingManagerId: string; employmentTypeId: string;
+}
+
+// Sub-components moved OUTSIDE parent component to prevent unmounting/losing input focus on re-render
+function FormSection({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
+  return (
+    <div className="glass-card" style={{ padding: 24, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid var(--surface-border)' }}>
+        <Icon size={16} color="#6366f1" />
+        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function FormField({ label, id, children }: { label: string; id: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label htmlFor={id} className="form-label">{label}</label>
+      {children}
+    </div>
+  );
 }
 
 export default function NewEmployeePage() {
@@ -58,11 +82,16 @@ export default function NewEmployeePage() {
     setLoading(true);
     setError('');
 
+    const payload = Object.fromEntries(
+      Object.entries(form).map(([k, v]) => [k, v === '' ? undefined : v])
+    );
+
     const res = await fetch('/api/employees', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
     });
+
 
     const data = await res.json() as { success?: boolean; data?: { employeeId: string }; message?: string };
     setLoading(false);
@@ -73,25 +102,6 @@ export default function NewEmployeePage() {
       setError(data.message ?? 'Failed to create employee');
     }
   }
-
-  const Section = ({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) => (
-    <div className="glass-card" style={{ padding: 24, marginBottom: 20 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid var(--surface-border)' }}>
-        <Icon size={16} color="#6366f1" />
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</span>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-        {children}
-      </div>
-    </div>
-  );
-
-  const Field = ({ label, id, children }: { label: string; id: string; children: React.ReactNode }) => (
-    <div>
-      <label htmlFor={id} className="form-label">{label}</label>
-      {children}
-    </div>
-  );
 
   return (
     <div className="animate-fade-in">
@@ -125,28 +135,28 @@ export default function NewEmployeePage() {
 
       <form onSubmit={handleSubmit}>
         {/* Personal Info */}
-        <Section title="Personal Information" icon={User}>
-          <Field label="First Name *" id="firstName">
+        <FormSection title="Personal Information" icon={User}>
+          <FormField label="First Name *" id="firstName">
             <input id="firstName" className="form-input" required value={form.firstName}
               onChange={(e) => setForm({ ...form, firstName: e.target.value })} placeholder="John" />
-          </Field>
-          <Field label="Last Name *" id="lastName">
+          </FormField>
+          <FormField label="Last Name *" id="lastName">
             <input id="lastName" className="form-input" required value={form.lastName}
               onChange={(e) => setForm({ ...form, lastName: e.target.value })} placeholder="Doe" />
-          </Field>
-          <Field label="Personal Email" id="personalEmail">
+          </FormField>
+          <FormField label="Personal Email" id="personalEmail">
             <input id="personalEmail" type="email" className="form-input" value={form.personalEmail}
               onChange={(e) => setForm({ ...form, personalEmail: e.target.value })} placeholder="john@gmail.com" />
-          </Field>
-          <Field label="Phone" id="phone">
+          </FormField>
+          <FormField label="Phone" id="phone">
             <input id="phone" className="form-input" value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91 98765 43210" />
-          </Field>
-          <Field label="Date of Birth" id="dateOfBirth">
+          </FormField>
+          <FormField label="Date of Birth" id="dateOfBirth">
             <input id="dateOfBirth" type="date" className="form-input" value={form.dateOfBirth}
               onChange={(e) => setForm({ ...form, dateOfBirth: e.target.value })} />
-          </Field>
-          <Field label="Gender" id="gender">
+          </FormField>
+          <FormField label="Gender" id="gender">
             <select id="gender" className="form-input" value={form.gender}
               onChange={(e) => setForm({ ...form, gender: e.target.value })}>
               <option value="">Select</option>
@@ -155,57 +165,57 @@ export default function NewEmployeePage() {
               <option value="OTHER">Other</option>
               <option value="PREFER_NOT_TO_SAY">Prefer not to say</option>
             </select>
-          </Field>
-        </Section>
+          </FormField>
+        </FormSection>
 
         {/* Employment */}
-        <Section title="Employment Details" icon={Briefcase}>
-          <Field label="Employee Code" id="employeeCode">
+        <FormSection title="Employment Details" icon={Briefcase}>
+          <FormField label="Employee Code" id="employeeCode">
             <input id="employeeCode" className="form-input" value={form.employeeCode}
               onChange={(e) => setForm({ ...form, employeeCode: e.target.value })}
               placeholder="Auto-generated if blank" />
-          </Field>
-          <Field label="Work Email" id="workEmail">
+          </FormField>
+          <FormField label="Work Email" id="workEmail">
             <input id="workEmail" type="email" className="form-input" value={form.workEmail}
               onChange={(e) => setForm({ ...form, workEmail: e.target.value })} placeholder="john@company.com" />
-          </Field>
-          <Field label="Joining Date" id="joiningDate">
+          </FormField>
+          <FormField label="Joining Date" id="joiningDate">
             <input id="joiningDate" type="date" className="form-input" value={form.joiningDate}
               onChange={(e) => setForm({ ...form, joiningDate: e.target.value })} />
-          </Field>
-        </Section>
+          </FormField>
+        </FormSection>
 
         {/* Organization */}
-        <Section title="Organization Mapping" icon={Building}>
-          <Field label="Department" id="departmentId">
+        <FormSection title="Organization Mapping" icon={Building}>
+          <FormField label="Department" id="departmentId">
             <select id="departmentId" className="form-input" value={form.departmentId}
               onChange={(e) => setForm({ ...form, departmentId: e.target.value })}>
               <option value="">Select Department</option>
               {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
             </select>
-          </Field>
-          <Field label="Designation" id="designationId">
+          </FormField>
+          <FormField label="Designation" id="designationId">
             <select id="designationId" className="form-input" value={form.designationId}
               onChange={(e) => setForm({ ...form, designationId: e.target.value })}>
               <option value="">Select Designation</option>
               {designations.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
             </select>
-          </Field>
-          <Field label="Location" id="locationId">
+          </FormField>
+          <FormField label="Location" id="locationId">
             <select id="locationId" className="form-input" value={form.locationId}
               onChange={(e) => setForm({ ...form, locationId: e.target.value })}>
               <option value="">Select Location</option>
               {locations.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
             </select>
-          </Field>
-          <Field label="Reporting Manager" id="reportingManagerId">
+          </FormField>
+          <FormField label="Reporting Manager" id="reportingManagerId">
             <select id="reportingManagerId" className="form-input" value={form.reportingManagerId}
               onChange={(e) => setForm({ ...form, reportingManagerId: e.target.value })}>
               <option value="">Select Manager</option>
               {managers.map(m => <option key={m._id} value={m._id}>{m.name}</option>)}
             </select>
-          </Field>
-        </Section>
+          </FormField>
+        </FormSection>
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>

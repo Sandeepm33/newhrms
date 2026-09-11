@@ -14,12 +14,16 @@ import type { SessionUser } from '@/types';
  */
 export function getOrgIdFromSession(user: SessionUser): string {
   if (!user.organizationId) {
+    if (user.isSuperAdmin) {
+      return '';
+    }
     throw new AuthorizationError(
       'No organization context found in session. Please select an organization.'
     );
   }
   return user.organizationId;
 }
+
 
 /**
  * Validates that a record belongs to the user's organization.

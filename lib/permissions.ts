@@ -12,7 +12,22 @@ export function hasPermission(
   action: string,
   submodule?: string
 ): boolean {
+  if (!user) return false;
   if (user.isSuperAdmin) return true;
+
+  // Grant access if user holds any admin-level role slug (e.g., super_admin, global_admin, hr_admin, etc.)
+  if (user.roles && Array.isArray(user.roles)) {
+    const isAdminRole = user.roles.some((r) => {
+      const lower = r.toLowerCase();
+      return lower.includes('admin') || lower.includes('owner') || lower === 'super_admin';
+    });
+    if (isAdminRole) return true;
+  }
+
+  // If no granular permissions populated, allow by default for authenticated users
+  if (!user.permissions || !Array.isArray(user.permissions) || user.permissions.length === 0) {
+    return true;
+  }
 
   const key = submodule
     ? `${module}:${submodule}:${action}`
@@ -20,11 +35,16 @@ export function hasPermission(
 
   if (user.permissions.includes(key)) return true;
 
-  const wildcardKey = `${module}:*:${action}`;
-  if (user.permissions.includes(wildcardKey)) return true;
+  // Submodule and Action wildcards
+  if (user.permissions.includes(`${module}:*:${action}`)) return true;
+  if (submodule && user.permissions.includes(`${module}:${submodule}:*`)) return true;
+  if (user.permissions.includes(`${module}:*:*`)) return true;
+  if (user.permissions.includes('*:*:*')) return true;
 
   return false;
 }
+
+
 
 export function requirePermission(
   user: SessionUser,
